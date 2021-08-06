@@ -1,32 +1,37 @@
 import React, { useState } from "react";
 import { View, TextInput, Button, StyleSheet, Alert } from "react-native";
 
-import { CardField, useConfirmPayment } from "@stripe/stripe-react-native";
+import { CardField, CardFieldInput, useConfirmPayment, handleCardAction } from "@stripe/stripe-react-native";
 
 const API_URL = "http://192.168.0.5:3000";
 
 export function StripeApp(props) {
-  const [email, setEmail] = useState();
-  const [cardDetails, setCardDetails] = useState();
+  const [email, setEmail] = useState('');
+  const [cardDetails, setCardDetails] = useState<CardFieldInput.Details>({
+  });
 
   const { confirmPayment, loading } = useConfirmPayment();
 
-  async function fetchPaymentIntentClientSecret() {
+  async function fetchPaymentIntentClientSecret(email: string) {
     const response = await fetch(`${API_URL}/create-payment-intent`, {
       method: "POST",
+      body: JSON.stringify({
+        email
+      }),
       headers: {
         "Content-Type": "application/json",
       },
     });
 
-    const { clientSecret, error } = await response.json();
+    const { client_secret, error } = await response.json();
 
-    return { clientSecret, error };
+    return { client_secret, error };
   }
 
   async function handlePayPress() {
+    console.log(cardDetails)
     //1.Gother the customer's billing information (e.g.,email)
-    if (!cardDetails?.complete || !email) {
+    if (!cardDetails.complete || !email) {
       Alert.alert("Please enter complete card details and email");
 
       return;
@@ -39,13 +44,15 @@ export function StripeApp(props) {
     //2.Fetch the intent client secret from the backend
 
     try {
-      const { clientSecret, error } = await fetchPaymentIntentClientSecret();
+      const { client_secret, error } = await fetchPaymentIntentClientSecret(email);
+      console.log(client_secret)
       if (error) {
-        console.log("Unable to process payment");
+        alert('Unable to process payment. Please try a valid customer email and credit card')
+        console.log("Unable to process payment", error);
       } else {
-        const { paymentIntent, error } = await confirmPayment(clientSecret, {
+        const { paymentIntent, error } = await confirmPayment(client_secret, {
           type: "Card",
-          billingDetails,
+          billingDetails
         });
         if (error) {
           alert(`Payment confirmation error ${error.message}`);
@@ -77,7 +84,7 @@ export function StripeApp(props) {
         }}
         cardStyle={styles.card}
         style={styles.cardContainer}
-        onCardChange={(cardDetails) => {
+        onCardChange={cardDetails => {
           setCardDetails(cardDetails);
         }}
       />
